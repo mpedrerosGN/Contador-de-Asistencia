@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Asistencia - Escuela Las Higueras (8°A)</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- FontAwesome for professional icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        sheet: {
+                            border: '#cbd5e1',
+                            headerBg: '#f1f5f9',
+                            hoverBg: '#f8fafc',
+                            weekendBg: '#e2e8f0',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbars and sleek light sheet styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        .matrix-cell {
+            transition: all 0.1s ease-in-out;
+            user-select: none;
+        }
+        table {
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #cbd5e1;
+        }
+        body.dark-theme { background: #0f172a; color: #e2e8f0; }
+        body.dark-theme header, body.dark-theme section, body.dark-theme main > div, body.dark-theme .bg-white { background-color: #1e293b !important; color: #e2e8f0; }
+        body.dark-theme .bg-slate-50, body.dark-theme .bg-slate-100 { background-color: #334155 !important; }
+        body.dark-theme .text-slate-900, body.dark-theme .text-slate-800, body.dark-theme .text-slate-700, body.dark-theme .text-slate-600 { color: #e2e8f0 !important; }
+    </style>
+</head>
+<body class="h-full bg-slate-100 text-slate-800 font-sans antialiased flex flex-col overflow-x-hidden">
+
+    <!-- Top Header Bar -->
+    <header class="bg-white border-b border-slate-200 px-6 py-4 flex flex-wrap justify-between items-center shadow-sm gap-4">
+        <div class="flex items-center space-x-4">
+            <div id="schoolLogoFallback" class="w-12 h-12 rounded-full bg-gradient-to-br from-red-600 to-red-900 border-2 border-amber-400 flex items-center justify-center shadow-md">
+                <i class="fa-solid fa-graduation-cap text-amber-300 text-xl"></i>
+            </div>
+            <img id="schoolLogo" class="hidden w-12 h-12 rounded-full object-cover border-2 border-amber-400 shadow-md" alt="Logo de la escuela">
+            <div>
+                <h1 class="text-xl font-bold tracking-wide text-slate-900 flex items-center gap-2">
+                    LISTA DE ASISTENCIA AUTOMATIZADA
+                    <span class="text-xs bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full font-semibold border border-blue-200">Planilla Oficial</span>
+                </h1>
+                <p class="text-xs text-slate-500">Control Escolar y Estadísticas en Vivo</p>
+            </div>
+        </div>
+
+        <!-- Global Action Toolbar -->
+        <div class="flex items-center gap-3 flex-wrap">
+            <button onclick="openAddStudentModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2">
+                <i class="fa-solid fa-user-plus"></i> Agregar Alumno
+            </button>
+            <button onclick="openCatalogModal('courses')" class="bg-violet-600 hover:bg-violet-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2">
+                <i class="fa-solid fa-book"></i> Gestionar Cursos
+            </button>
+            <button onclick="openCatalogModal('teachers')" class="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2">
+                <i class="fa-solid fa-chalkboard-user"></i> Gestionar Profesores
+            </button>
+            <button onclick="document.getElementById('logoInput').click()" class="bg-slate-700 hover:bg-slate-800 text-white px-3 py-2 rounded-lg text-sm font-medium transition" title="Cambiar logo">Logo</button>
+            <button id="themeToggle" onclick="cycleTheme()" class="bg-slate-700 hover:bg-slate-800 text-white px-3 py-2 rounded-lg text-sm font-medium transition" title="Cambiar tema">Tema: Sistema</button>
+            <button onclick="exportToExcelCSV()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2">
+                <i class="fa-solid fa-file-excel"></i> Descargar Excel (CSV)
+            </button>
+            <button onclick="resetMonthData()" class="bg-white hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium transition border border-slate-300 shadow-sm" title="Reiniciar Mes">
+                <i class="fa-solid fa-rotate-right text-slate-500"></i>
+            </button>
+        </div>
+    </header>
+    <input id="logoInput" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="hidden" onchange="handleLogoUpload(event)">
+
+    <!-- Institutional Info Card matching reference -->
+    <section class="bg-white border-b border-slate-200 px-6 py-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-center shadow-sm">
+        <!-- Metadata fields -->
+        <div class="md:col-span-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+            <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                <span class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Institución</span>
+                <input type="text" id="schoolName" value="ESCUELA LAS HIGUERAS" onchange="updateMeta()" class="bg-transparent font-bold text-slate-900 w-full focus:outline-none focus:border-blue-500 border-b border-transparent text-sm">
+            </div>
+            <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                <span class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Profesora Jefe</span>
+                <select id="teacherName" onchange="updateTeacherForCurrentCourse()" class="bg-transparent font-bold text-slate-900 w-full focus:outline-none focus:border-blue-500 border-b border-transparent text-sm"></select>
+            </div>
+            <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                <span class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Curso / Año</span>
+                <div class="flex gap-2">
+                    <select id="courseName" onchange="changeCourse()" class="bg-transparent font-bold text-slate-900 w-28 focus:outline-none border-b border-transparent text-sm"></select>
+                    <span class="text-slate-400">|</span>
+                    <input type="text" id="yearVal" value="2026" onchange="updateMeta()" class="bg-transparent font-bold text-slate-900 w-16 focus:outline-none border-b border-transparent text-sm">
+                </div>
+            </div>
+            <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                <span class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Mes de Registro</span>
+                <select id="monthSelect" onchange="changeMonth()" class="bg-white font-bold text-slate-900 w-full rounded border border-slate-300 py-1 px-2 focus:outline-none text-sm shadow-sm">
+                    <option value="Enero">Enero</option>
+                    <option value="Febrero">Febrero</option>
+                    <option value="Septiembre">Septiembre</option>
+                    <option value="Marzo">Marzo</option>
+                    <option value="Abril">Abril</option>
+                    <option value="Mayo">Mayo</option>
+                    <option value="Junio">Junio</option>
+                    <option value="Julio">Julio</option>
+                    <option value="Agosto">Agosto</option>
+                    <option value="Octubre">Octubre</option>
+                    <option value="Noviembre">Noviembre</option>
+                    <option value="Diciembre">Diciembre</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Leyenda Box matching reference -->
+        <div class="md:col-span-4 bg-slate-50 p-3 rounded-xl border border-slate-300 shadow-sm flex flex-col justify-center">
+            <div class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 text-center border-b border-slate-200 pb-1">
+                Leyenda & Porcentaje Global
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+                <div class="flex items-center justify-between bg-white px-2.5 py-1 rounded border border-slate-200">
+                    <span class="flex items-center gap-1.5"><span class="w-4 h-4 rounded bg-emerald-600 text-white flex items-center justify-center font-bold text-[10px]">✓</span> Asistencia = 1</span>
+                    <span id="legendPctAsis" class="font-bold text-emerald-700">0%</span>
+                </div>
+                <div class="flex items-center justify-between bg-white px-2.5 py-1 rounded border border-slate-200">
+                    <span class="flex items-center gap-1.5"><span class="w-4 h-4 rounded bg-red-600 text-white flex items-center justify-center font-bold text-[10px]">✗</span> Ausencia = 0</span>
+                    <span id="legendPctAus" class="font-bold text-red-600">0%</span>
+                </div>
+                <div class="flex items-center justify-between bg-white px-2.5 py-1 rounded border border-slate-200">
+                    <span class="flex items-center gap-1.5"><span class="w-4 h-4 rounded bg-amber-400 text-slate-900 flex items-center justify-center font-bold text-[10px]">T</span> Tardanza = T</span>
+                    <span id="legendPctTar" class="font-bold text-amber-700">0%</span>
+                </div>
+                <div class="flex items-center justify-between bg-white px-2.5 py-1 rounded border border-slate-200">
+                    <span class="flex items-center gap-1.5"><span class="w-4 h-4 rounded bg-orange-600 text-white flex items-center justify-center font-bold text-[10px]">J</span> Justificación = J</span>
+                    <span id="legendPctJus" class="font-bold text-orange-700">0%</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Main Interactive Attendance Sheet Container -->
+    <main class="flex-1 p-4 overflow-hidden flex flex-col">
+        <div class="bg-white border border-slate-300 rounded-xl shadow-lg flex-1 flex flex-col overflow-hidden">
+            
+            <!-- Controls Bar inside table header -->
+            <div class="bg-slate-100 px-4 py-2.5 border-b border-slate-300 flex flex-wrap justify-between items-center gap-3">
+                <div class="flex items-center gap-2 text-xs text-slate-600 font-medium">
+                    <i class="fa-solid fa-circle-info text-blue-600"></i>
+                    <span>Haga clic en una celda para alternar estado (<span class="text-emerald-600 font-bold">✓</span> Asistencia → <span class="text-red-600 font-bold">✗</span> Ausencia → <span class="text-amber-600 font-bold">T</span> Tardanza → <span class="text-orange-600 font-bold">J</span> Justificación → Vacío). Clic derecho o botón de nota para observaciones.</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-slate-600">Total Alumnos: <strong id="totalStudentsCount" class="text-slate-900">0</strong></span>
+                </div>
+            </div>
+
+            <!-- Scrollable Matrix Grid -->
+            <div class="flex-1 overflow-auto relative">
+                <table id="attendanceTable" class="w-full text-left text-xs whitespace-nowrap bg-white">
+                    <!-- Table Header will be injected by JavaScript -->
+                    <thead id="tableHeader" class="sticky top-0 z-20 bg-slate-100 text-slate-700 shadow-sm"></thead>
+                    <!-- Table Body will be injected by JavaScript -->
+                    <tbody id="tableBody" class="divide-y divide-slate-200"></tbody>
+                </table>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Modal: Student Form / Add Student -->
+    <div id="studentModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white border border-slate-300 rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-200 pb-3">
+                <h3 id="modalTitle" class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <i class="fa-solid fa-user-plus text-blue-600"></i> Agregar Nuevo Alumno
+                </h3>
+                <button onclick="closeStudentModal()" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form id="studentForm" onsubmit="handleSaveStudent(event)" class="space-y-4">
+                <input type="hidden" id="editStudentId">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Apellidos y Nombres (Formato Sábana)</label>
+                    <input type="text" id="studentNameInput" required placeholder="EJ: PÉREZ SOTO, JUAN CARLOS" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 uppercase focus:outline-none focus:border-blue-600 shadow-sm text-sm">
+                </div>
+                <div class="flex justify-end gap-3 pt-4 border-t border-slate-200">
+                    <button type="button" onclick="closeStudentModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition">Cancelar</button>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition shadow-sm">Guardar Alumno</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Daily Note / Observation -->
+    <div id="noteModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white border border-slate-300 rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-200 pb-3">
+                <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <i class="fa-solid fa-comment-dots text-amber-600"></i> Observación / Comentario Diario
+                </h3>
+                <button onclick="closeNoteModal()" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <p id="noteStudentDayInfo" class="text-xs text-blue-700 font-semibold mb-2"></p>
+                    <textarea id="noteTextInput" rows="4" placeholder="Ej: Cita médica justificada con certificado, atraso por transporte, etc." class="w-full bg-white border border-slate-300 rounded-lg p-3 text-slate-900 focus:outline-none focus:border-blue-600 text-sm shadow-sm"></textarea>
+                </div>
+                <div class="flex justify-between items-center pt-4 border-t border-slate-200">
+                    <button type="button" onclick="clearNote()" class="bg-red-50 hover:bg-red-100 text-red-600 px-3 py-2 rounded-lg text-xs font-medium transition border border-red-200">Eliminar Nota</button>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="closeNoteModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition">Cancelar</button>
+                        <button type="button" onclick="saveNote()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition shadow-sm">Guardar Nota</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Course and teacher management -->
+    <div id="catalogModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white border border-slate-300 rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-200 pb-3">
+                <h3 id="catalogModalTitle" class="text-lg font-bold text-slate-900"></h3>
+                <button type="button" onclick="closeCatalogModal()" aria-label="Cerrar"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form onsubmit="handleSaveCatalog(event)" class="flex gap-2 mb-4">
+                <input type="text" id="catalogNameInput" maxlength="80" required class="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm" placeholder="Escriba un nombre">
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">Agregar</button>
+            </form>
+            <div id="catalogItems" class="space-y-2 max-h-64 overflow-y-auto"></div>
+        </div>
+    </div>
+
+    <!-- Notification Toast Message Box -->
+    <div id="toastNotification" class="fixed bottom-6 right-6 bg-slate-900 border border-slate-800 text-white px-5 py-3 rounded-xl shadow-2xl z-50 transform translate-y-24 opacity-0 transition-all duration-300 flex items-center gap-3">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-lg"></i>
+        <span id="toastMessage" class="text-sm font-medium">Operación realizada con éxito</span>
+    </div>
+
+    <!-- Application JavaScript Logic -->
+    <script>
+        // State Management
+        let appState = {
+            school: "ESCUELA LAS HIGUERAS",
+            year: "2026",
+            month: "Septiembre",
+            teachers: ["PROF. NATHALIE DOMOSO SOTO"],
+            courses: [{ id: "course_1", name: "8°A", teacher: "PROF. NATHALIE DOMOSO SOTO" }],
+            currentCourseId: "course_1",
+            theme: "system",
+            logoDataUrl: "",
+            students: [
+                { id: 1, name: "AYALA GALLARDO JESÚS ALEJANDRO" },
+                { id: 2, name: "CIFUENTES STUARDO ANTONELLA IGNACIA" },
+                { id: 3, name: "LIMA ADAM MARDEN MATHEO" },
+                { id: 4, name: "MARTÍNEZ ASTETE YENDERLYN STEPHANIA" },
+                { id: 5, name: "MUÑOZ LARA MARIO GABRIEL GERARDO" },
+                { id: 6, name: "NAVARRETE RAMÍREZ MAYRA DOMINIQUE" },
+                { id: 7, name: "ORTEGA ORELLANA YOSTIN EDUARDO" },
+                { id: 8, name: "QUINTANA PIZARRO IGNACIA TRINIDAD" },
+                { id: 9, name: "RIVAS SÁNCHEZ ELIZABETH ALEJANDRA" },
+                { id: 10, name: "ROJAS MATUTE JESÚS DAVID" },
+                { id: 11, name: "TORRES REBOLLEDO RODRIGO YAHIR" },
+                { id: 12, name: "LÓPEZ HERRERA CAMILA IGNACIA" }
+            ],
+            // attendance: { studentId_dayNum: { status: '1'|'0'|'T'|'J', note: '' } }
+            attendance: {},
+            courseData: {},
+            daysInMonth: 30
+        };
+
+        const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+        const weekdayNames = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+
+        function getCalendar() {
+            const year = Number(appState.year) || new Date().getFullYear();
+            const monthIndex = Math.max(0, monthNames.indexOf(appState.month));
+            const days = new Date(year, monthIndex + 1, 0).getDate();
+            return { days, weekdays: Array.from({ length: days }, (_, index) => weekdayNames[new Date(year, monthIndex, index + 1).getDay()]) };
+        }
+
+        function getPeriodKey() {
+            const month = String(monthNames.indexOf(appState.month) + 1).padStart(2, '0');
+            return `${appState.year}-${month}`;
+        }
+
+        let currentNoteContext = { studentId: null, day: null };
+        let currentCatalogType = null;
+
+        function getCurrentCourse() {
+            return appState.courses.find(course => course.id === appState.currentCourseId) || appState.courses[0];
+        }
+
+        function saveActiveCourseData() {
+            const course = getCurrentCourse();
+            if (!course) return;
+            const record = appState.courseData[course.id] || {};
+            record.students = appState.students;
+            record.attendanceByPeriod = record.attendanceByPeriod || {};
+            record.attendanceByPeriod[getPeriodKey()] = appState.attendance;
+            appState.courseData[course.id] = record;
+        }
+
+        function loadActiveCourseData() {
+            const course = getCurrentCourse();
+            const savedCourse = appState.courseData[course.id] || { students: [], attendanceByPeriod: {} };
+            appState.students = Array.isArray(savedCourse.students) ? savedCourse.students : [];
+            appState.attendance = (savedCourse.attendanceByPeriod && savedCourse.attendanceByPeriod[getPeriodKey()]) || savedCourse.attendance || {};
+        }
+
+        function renderCourseAndTeacherSelects() {
+            const course = getCurrentCourse();
+            const courseSelect = document.getElementById('courseName');
+            const teacherSelect = document.getElementById('teacherName');
+            courseSelect.replaceChildren(...appState.courses.map(item => {
+                const option = document.createElement('option');
+                option.value = item.id;
+                option.textContent = item.name;
+                return option;
+            }));
+            teacherSelect.replaceChildren(...appState.teachers.map(item => {
+                const option = document.createElement('option');
+                option.value = item;
+                option.textContent = item;
+                return option;
+            }));
+            courseSelect.value = course.id;
+            teacherSelect.value = course.teacher;
+        }
+
+        function applyTheme() {
+            const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const isDark = appState.theme === 'dark' || (appState.theme === 'system' && prefersDark);
+            document.body.classList.toggle('dark-theme', isDark);
+            document.getElementById('themeToggle').textContent = 'Tema: ' + ({ light: 'Claro', dark: 'Oscuro', system: 'Sistema' })[appState.theme];
+        }
+
+        function cycleTheme() {
+            appState.theme = appState.theme === 'system' ? 'light' : appState.theme === 'light' ? 'dark' : 'system';
+            applyTheme();
+            saveData();
+        }
+
+        function renderLogo() {
+            const image = document.getElementById('schoolLogo');
+            const fallback = document.getElementById('schoolLogoFallback');
+            const hasLogo = Boolean(appState.logoDataUrl);
+            image.src = hasLogo ? appState.logoDataUrl : '';
+            image.classList.toggle('hidden', !hasLogo);
+            fallback.classList.toggle('hidden', hasLogo);
+        }
+
+        function handleLogoUpload(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+            const allowedTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
+            if (!allowedTypes.includes(file.type) || file.size > 2 * 1024 * 1024) {
+                showToast('Use PNG, JPG, WEBP o SVG de hasta 2 MB');
+                event.target.value = '';
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = () => {
+                appState.logoDataUrl = String(reader.result);
+                renderLogo();
+                saveData();
+                showToast('Logo actualizado');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function escapeHTML(value) {
+            const element = document.createElement('div');
+            element.textContent = String(value);
+            return element.innerHTML;
+        }
+
+        // Load from LocalStorage on start
+        function loadData() {
+            const saved = localStorage.getItem('escuela_higueras_asistencia_light_data');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    appState = { ...appState, ...parsed };
+                    if (!Array.isArray(parsed.courses)) {
+                        appState.courses = [];
+                        appState.currentCourseId = null;
+                    }
+                } catch (e) {
+                    console.error("Error loading saved data", e);
+                }
+            }
+            // Migrate the previous one-course format without losing records.
+            if (!Array.isArray(appState.courses) || appState.courses.length === 0) {
+                const legacyTeacher = appState.teacher || 'PROF. NATHALIE DOMOSO SOTO';
+                const legacyCourse = appState.course || '8°A';
+                appState.teachers = [legacyTeacher];
+                appState.courses = [{ id: 'course_1', name: legacyCourse, teacher: legacyTeacher }];
+                appState.currentCourseId = 'course_1';
+            }
+            if (!Array.isArray(appState.teachers) || appState.teachers.length === 0) appState.teachers = ['PROF. NATHALIE DOMOSO SOTO'];
+            if (!appState.currentCourseId || !appState.courses.some(course => course.id === appState.currentCourseId)) appState.currentCourseId = appState.courses[0].id;
+            if (!appState.courseData || typeof appState.courseData !== 'object') appState.courseData = {};
+            const currentCourse = getCurrentCourse();
+            if (!appState.courseData[currentCourse.id]) appState.courseData[currentCourse.id] = { students: appState.students || [], attendanceByPeriod: { [getPeriodKey()]: appState.attendance || {} } };
+            loadActiveCourseData();
+            renderCourseAndTeacherSelects();
+            renderLogo();
+            applyTheme();
+            document.getElementById('schoolName').value = appState.school;
+            document.getElementById('yearVal').value = appState.year;
+            document.getElementById('monthSelect').value = appState.month;
+        }
+
+        function saveData() {
+            saveActiveCourseData();
+            localStorage.setItem('escuela_higueras_asistencia_light_data', JSON.stringify(appState));
+        }
+
+        // Initialize table on load
+        window.onload = async function() {
+            loadData();
+            await importWorkbookDataOnce();
+            renderTable();
+            updateGlobalStats();
+        };
+
+        function updateMeta() {
+            appState.school = document.getElementById('schoolName').value;
+            appState.year = document.getElementById('yearVal').value;
+            saveData();
+            renderTable();
+            showToast("Datos institucionales actualizados");
+        }
+
+        function changeCourse() {
+            saveActiveCourseData();
+            appState.currentCourseId = document.getElementById('courseName').value;
+            const course = getCurrentCourse();
+            if (course.defaultMonth) appState.month = course.defaultMonth;
+            loadActiveCourseData();
+            renderCourseAndTeacherSelects();
+            document.getElementById('monthSelect').value = appState.month;
+            saveData();
+            renderTable();
+            showToast('Curso cambiado a ' + getCurrentCourse().name);
+        }
+
+        function updateTeacherForCurrentCourse() {
+            getCurrentCourse().teacher = document.getElementById('teacherName').value;
+            saveData();
+            showToast('Profesor asignado al curso');
+        }
+
+        async function importWorkbookDataOnce() {
+            const importKey = 'escuela_higueras_excel_import_v1';
+            if (localStorage.getItem(importKey) || typeof XLSX === 'undefined') return;
+            try {
+                const response = await fetch('/source.xlsx');
+                if (!response.ok) throw new Error('Archivo no disponible');
+                const workbook = XLSX.read(await response.arrayBuffer(), { type: 'array' });
+                const courses = [];
+                const courseData = {};
+                const teachers = [];
+                workbook.SheetNames.slice(0, 9).forEach((sheetName, index) => {
+                    const sheet = workbook.Sheets[sheetName];
+                    const valueAt = address => String(sheet[address] ? sheet[address].v : '').trim();
+                    const name = valueAt('E7') || valueAt('F7') || sheetName;
+                    const teacher = [valueAt('E5'), valueAt('F5'), valueAt('G5')].filter(Boolean).join(' ').replace(/\s+/g, ' ');
+                    const defaultMonth = valueAt('S9') || 'Septiembre';
+                    const id = `course_excel_${index + 1}`;
+                    const students = [];
+                    const attendance = {};
+                    for (let row = 15; row <= 60; row++) {
+                        const studentName = valueAt(`C${row}`);
+                        if (!studentName) continue;
+                        const studentId = students.length + 1;
+                        students.push({ id: studentId, name: studentName });
+                        for (let day = 1; day <= 31; day++) {
+                            const status = valueAt(`${XLSX.utils.encode_col(day + 3)}${row}`);
+                            if (['1', '0', 'T', 'J'].includes(status)) attendance[`${studentId}_${day}`] = { status, note: '' };
+                        }
+                    }
+                    courses.push({ id, name, teacher: teacher || 'SIN ASIGNAR', defaultMonth });
+                    if (!teachers.includes(teacher || 'SIN ASIGNAR')) teachers.push(teacher || 'SIN ASIGNAR');
+                    const monthIndex = monthNames.indexOf(defaultMonth) + 1;
+                    const period = `2026-${String(monthIndex).padStart(2, '0')}`;
+                    courseData[id] = { students, attendanceByPeriod: { [period]: attendance } };
+                });
+                if (courses.length === 0) throw new Error('No se encontraron cursos');
+                appState.courses = courses;
+                appState.teachers = teachers;
+                appState.courseData = courseData;
+                appState.currentCourseId = courses[courses.length - 1].id;
+                appState.year = '2026';
+                appState.month = courses[courses.length - 1].defaultMonth;
+                loadActiveCourseData();
+                renderCourseAndTeacherSelects();
+                document.getElementById('yearVal').value = appState.year;
+                document.getElementById('monthSelect').value = appState.month;
+                localStorage.setItem(importKey, 'true');
+                saveData();
+                showToast('Excel importado: cursos, profesores y alumnos cargados');
+            } catch (error) {
+                console.error('No se pudo importar el Excel', error);
+            }
+        }
+
+        function changeMonth() {
+            saveActiveCourseData();
+            appState.month = document.getElementById('monthSelect').value;
+            loadActiveCourseData();
+            saveData();
+            renderTable();
+            showToast("Mes cambiado a " + appState.month);
+        }
+
+        // Render Matrix Table
+        function renderTable() {
+            appState.daysInMonth = getCalendar().days;
+            const headerEl = document.getElementById('tableHeader');
+            const bodyEl = document.getElementById('tableBody');
+            document.getElementById('totalStudentsCount').textContent = appState.students.length;
+
+            // 1. Build Header Row 1 (Day Letters: M M J V S D...)
+            let htmlHeaderDays = `<tr class="bg-slate-100 border-b border-slate-300 text-center font-bold text-slate-700">
+                <th class="p-2.5 w-12 border-r border-slate-300 sticky left-0 z-30 bg-slate-100">Nº</th>
+                <th class="p-2.5 min-w-[260px] border-r border-slate-300 sticky left-12 z-30 bg-slate-100 text-left">Nombres y Apellidos</th>`;
+            
+            for (let d = 1; d <= getCalendar().days; d++) {
+                const wDay = getCalendar().weekdays[d - 1];
+                const isWeekend = (wDay === 'S' || wDay === 'D');
+                const bgClass = isWeekend ? 'bg-slate-200 text-slate-500' : 'bg-slate-100 text-slate-700';
+                htmlHeaderDays += `<th class="p-2 border-r border-slate-300 text-center ${bgClass}"><div class="text-[10px] uppercase">${wDay}</div></th>`;
+            }
+
+            htmlHeaderDays += `
+                <th class="p-2 bg-emerald-50 text-emerald-800 border-r border-slate-300 text-center font-bold" title="% Asistencia"><i class="fa-solid fa-check"></i></th>
+                <th class="p-2 bg-red-50 text-red-800 border-r border-slate-300 text-center font-bold" title="% Ausencia"><i class="fa-solid fa-xmark"></i></th>
+                <th class="p-2 bg-amber-50 text-amber-800 border-r border-slate-300 text-center font-bold" title="% Tardanza"><i class="fa-solid fa-clock"></i></th>
+                <th class="p-2 bg-orange-50 text-orange-800 text-center font-bold" title="% Justificación"><i class="fa-solid fa-file-lines"></i></th>
+                <th class="p-2 bg-slate-100 text-center font-bold">Acciones</th>
+            </tr>`;
+
+            // 2. Build Header Row 2 (Day Numbers: 1 2 3 4...)
+            let htmlHeaderNums = `<tr class="bg-slate-50 border-b-2 border-slate-300 text-center text-slate-700">
+                <th class="p-2 border-r border-slate-300 sticky left-0 z-30 bg-slate-50"></th>
+                <th class="p-2 border-r border-slate-300 sticky left-12 z-30 bg-slate-50"></th>`;
+
+            for (let d = 1; d <= getCalendar().days; d++) {
+                const wDay = getCalendar().weekdays[d - 1];
+                const isWeekend = (wDay === 'S' || wDay === 'D');
+                const bgClass = isWeekend ? 'bg-slate-200 text-slate-500' : 'bg-slate-50 text-slate-700';
+                htmlHeaderNums += `<th class="p-1.5 border-r border-slate-300 text-center ${bgClass} font-bold text-xs">${d}</th>`;
+            }
+
+            htmlHeaderNums += `
+                <th class="p-2 bg-emerald-50/50 border-r border-slate-300"></th>
+                <th class="p-2 bg-red-50/50 border-r border-slate-300"></th>
+                <th class="p-2 bg-amber-50/50 border-r border-slate-300"></th>
+                <th class="p-2 bg-orange-50/50"></th>
+                <th class="p-2 bg-slate-100"></th>
+            </tr>`;
+
+            headerEl.innerHTML = htmlHeaderDays + htmlHeaderNums;
+
+            // 3. Build Body Rows per Student
+            if (appState.students.length === 0) {
+                bodyEl.innerHTML = `<tr><td colspan="${appState.daysInMonth + 7}" class="text-center py-8 text-slate-400">No hay alumnos registrados. Haga clic en "Agregar Alumno".</td></tr>`;
+                return;
+            }
+
+            let bodyHtml = '';
+            appState.students.forEach((student, index) => {
+                const stats = calculateStudentStats(student.id);
+
+                bodyHtml += `<tr class="hover:bg-slate-50 transition border-b border-slate-200">
+                    <td class="p-2.5 text-center border-r border-slate-200 font-bold text-slate-600 sticky left-0 bg-white">${index + 1}</td>
+                    <td class="p-2.5 border-r border-slate-200 font-semibold text-slate-900 sticky left-12 bg-white flex items-center justify-between group">
+                        <span>${escapeHTML(student.name)}</span>
+                        <button onclick="editStudent(${student.id})" class="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-600 transition px-1" title="Editar nombre"><i class="fa-solid fa-pen"></i></button>
+                    </td>`;
+
+                for (let d = 1; d <= getCalendar().days; d++) {
+                    const wDay = getCalendar().weekdays[d - 1];
+                    const isWeekend = (wDay === 'S' || wDay === 'D');
+                    const key = `${student.id}_${d}`;
+                    const entry = appState.attendance[key] || { status: '', note: '' };
+
+                    if (isWeekend) {
+                        bodyHtml += `<td class="p-1.5 border-r border-slate-200 bg-slate-100 text-center text-slate-400 font-medium">-</td>`;
+                    } else {
+                        let badgeClass = 'text-slate-400 hover:bg-slate-100';
+                        let displayVal = '';
+
+                        if (entry.status === '1') {
+                            badgeClass = 'bg-emerald-100 text-emerald-800 font-bold border border-emerald-300';
+                            displayVal = '✓';
+                        } else if (entry.status === '0') {
+                            badgeClass = 'bg-red-100 text-red-800 font-bold border border-red-300';
+                            displayVal = '✗';
+                        } else if (entry.status === 'T') {
+                            badgeClass = 'bg-amber-100 text-amber-800 font-bold border border-amber-300';
+                            displayVal = 'T';
+                        } else if (entry.status === 'J') {
+                            badgeClass = 'bg-orange-100 text-orange-800 font-bold border border-orange-300';
+                            displayVal = 'J';
+                        }
+
+                        const hasNoteIndicator = entry.note && entry.note.trim() !== '' ? '<span class="absolute top-0.5 right-0.5 w-1.5 h-1.5 bg-blue-600 rounded-full"></span>' : '';
+
+                        bodyHtml += `<td class="p-1 border-r border-slate-200 text-center relative cursor-pointer matrix-cell" onclick="cycleAttendance(${student.id}, ${d})" oncontextmenu="openNoteModalDirect(event, ${student.id}, ${d})">
+                            <div class="w-6 h-6 mx-auto rounded flex items-center justify-center text-xs relative shadow-2xs ${badgeClass}" title="Clic para cambiar estado. Clic derecho para nota.">
+                                ${displayVal}
+                                ${hasNoteIndicator}
+                            </div>
+                        </td>`;
+                    }
+                }
+
+                // Summary percentage columns
+                bodyHtml += `
+                    <td class="p-2 text-center font-bold text-emerald-700 bg-emerald-50/60 border-r border-slate-200">${stats.pctAsis}%</td>
+                    <td class="p-2 text-center font-bold text-red-700 bg-red-50/60 border-r border-slate-200">${stats.pctAus}%</td>
+                    <td class="p-2 text-center font-bold text-amber-700 bg-amber-50/60 border-r border-slate-200">${stats.pctTar}%</td>
+                    <td class="p-2 text-center font-bold text-orange-700 bg-orange-50/60 border-r border-slate-200">${stats.pctJus}%</td>
+                    <td class="p-2 text-center flex justify-center gap-2">
+                        <button onclick="openNoteModalForStudent(${student.id})" class="text-slate-400 hover:text-amber-600 transition p-1" title="Ver notas del alumno"><i class="fa-solid fa-notes-medical"></i></button>
+                        <button onclick="deleteStudent(${student.id})" class="text-slate-400 hover:text-red-600 transition p-1" title="Eliminar alumno"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>`;
+            });
+
+            bodyEl.innerHTML = bodyHtml;
+            updateGlobalStats();
+        }
+
+        // Cycle attendance state on click: '' -> '1' -> '0' -> 'T' -> 'J' -> ''
+        function cycleAttendance(studentId, day) {
+            const key = `${studentId}_${day}`;
+            const current = appState.attendance[key] ? appState.attendance[key].status : '';
+            let next = '';
+
+            if (current === '') next = '1';
+            else if (current === '1') next = '0';
+            else if (current === '0') next = 'T';
+            else if (current === 'T') next = 'J';
+            else if (current === 'J') next = '';
+
+            if (!appState.attendance[key]) {
+                appState.attendance[key] = { status: next, note: '' };
+            } else {
+                appState.attendance[key].status = next;
+            }
+
+            saveData();
+            renderTable();
+        }
+
+        // Calculate percentages for a student (excluding weekends)
+        function calculateStudentStats(studentId) {
+            let totalSchoolDays = 0;
+            let countAsis = 0;
+            let countAus = 0;
+            let countTar = 0;
+            let countJus = 0;
+
+            for (let d = 1; d <= getCalendar().days; d++) {
+                const wDay = getCalendar().weekdays[d - 1];
+                if (wDay !== 'S' && wDay !== 'D') {
+                    totalSchoolDays++;
+                    const key = `${studentId}_${d}`;
+                    const entry = appState.attendance[key];
+                    if (entry) {
+                        if (entry.status === '1') countAsis++;
+                        else if (entry.status === '0') countAus++;
+                        else if (entry.status === 'T') countTar++;
+                        else if (entry.status === 'J') countJus++;
+                    }
+                }
+            }
+
+            if (totalSchoolDays === 0) return { pctAsis: 0, pctAus: 0, pctTar: 0, pctJus: 0 };
+
+            return {
+                pctAsis: Math.round((countAsis / totalSchoolDays) * 100),
+                pctAus: Math.round((countAus / totalSchoolDays) * 100),
+                pctTar: Math.round((countTar / totalSchoolDays) * 100),
+                pctJus: Math.round((countJus / totalSchoolDays) * 100)
+            };
+        }
+
+        // Update global legend percentage summary
+        function updateGlobalStats() {
+            let totalSlots = 0;
+            let totalAsis = 0, totalAus = 0, totalTar = 0, totalJus = 0;
+
+            appState.students.forEach(student => {
+                for (let d = 1; d <= getCalendar().days; d++) {
+                    const wDay = getCalendar().weekdays[d - 1];
+                    if (wDay !== 'S' && wDay !== 'D') {
+                        totalSlots++;
+                        const key = `${student.id}_${d}`;
+                        const entry = appState.attendance[key];
+                        if (entry) {
+                            if (entry.status === '1') totalAsis++;
+                            else if (entry.status === '0') totalAus++;
+                            else if (entry.status === 'T') totalTar++;
+                            else if (entry.status === 'J') totalJus++;
+                        }
+                    }
+                }
+            });
+
+            if (totalSlots === 0) {
+                document.getElementById('legendPctAsis').textContent = '0%';
+                document.getElementById('legendPctAus').textContent = '0%';
+                document.getElementById('legendPctTar').textContent = '0%';
+                document.getElementById('legendPctJus').textContent = '0%';
+                return;
+            }
+
+            document.getElementById('legendPctAsis').textContent = Math.round((totalAsis / totalSlots) * 100) + '%';
+            document.getElementById('legendPctAus').textContent = Math.round((totalAus / totalSlots) * 100) + '%';
+            document.getElementById('legendPctTar').textContent = Math.round((totalTar / totalSlots) * 100) + '%';
+            document.getElementById('legendPctJus').textContent = Math.round((totalJus / totalSlots) * 100) + '%';
+        }
+
+        // Student Modal Handlers
+        function openAddStudentModal() {
+            document.getElementById('editStudentId').value = '';
+            document.getElementById('studentNameInput').value = '';
+            document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-user-plus text-blue-600"></i> Agregar Nuevo Alumno';
+            document.getElementById('studentModal').classList.remove('hidden');
+        }
+
+        function editStudent(id) {
+            const student = appState.students.find(s => s.id === id);
+            if (!student) return;
+            document.getElementById('editStudentId').value = student.id;
+            document.getElementById('studentNameInput').value = student.name;
+            document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-user-pen text-blue-600"></i> Editar Alumno';
+            document.getElementById('studentModal').classList.remove('hidden');
+        }
+
+        function closeStudentModal() {
+            document.getElementById('studentModal').classList.add('hidden');
+        }
+
+        function handleSaveStudent(e) {
+            e.preventDefault();
+            const idVal = document.getElementById('editStudentId').value;
+            const nameVal = document.getElementById('studentNameInput').value.trim().toUpperCase();
+
+            if (!nameVal) return;
+
+            if (idVal) {
+                const student = appState.students.find(s => s.id == idVal);
+                if (student) student.name = nameVal;
+                showToast("Alumno actualizado correctamente");
+            } else {
+                const newId = appState.students.length > 0 ? Math.max(...appState.students.map(s => s.id)) + 1 : 1;
+                appState.students.push({ id: newId, name: nameVal });
+                showToast("Alumno agregado correctamente");
+            }
+
+            saveData();
+            closeStudentModal();
+            renderTable();
+        }
+
+        function deleteStudent(id) {
+            if (confirm("¿Está seguro de eliminar este alumno de la lista?")) {
+                appState.students = appState.students.filter(s => s.id !== id);
+                saveData();
+                renderTable();
+                showToast("Alumno eliminado");
+            }
+        }
+
+        function normalizeCatalogName(value) {
+            return value.trim().replace(/\s+/g, ' ').slice(0, 80);
+        }
+
+        function openCatalogModal(type) {
+            currentCatalogType = type;
+            document.getElementById('catalogModalTitle').textContent = type === 'courses' ? 'Gestionar Cursos' : 'Gestionar Profesores';
+            document.getElementById('catalogNameInput').value = '';
+            document.getElementById('catalogNameInput').placeholder = type === 'courses' ? 'Ej.: 8°B' : 'Ej.: PROF. ANA PÉREZ';
+            renderCatalogItems();
+            document.getElementById('catalogModal').classList.remove('hidden');
+        }
+
+        function closeCatalogModal() {
+            document.getElementById('catalogModal').classList.add('hidden');
+            currentCatalogType = null;
+        }
+
+        function renderCatalogItems() {
+            const container = document.getElementById('catalogItems');
+            container.replaceChildren();
+            const items = currentCatalogType === 'courses' ? appState.courses : appState.teachers;
+            items.forEach((item, index) => {
+                const row = document.createElement('div');
+                row.className = 'flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2';
+                const label = document.createElement('span');
+                label.className = 'min-w-0 flex-1 truncate text-sm font-medium text-slate-800';
+                label.textContent = currentCatalogType === 'courses' ? item.name : item;
+                const actions = document.createElement('div');
+                actions.className = 'flex gap-1';
+                const editButton = document.createElement('button');
+                editButton.type = 'button';
+                editButton.className = 'px-2 py-1 text-blue-600 hover:text-blue-800';
+                editButton.innerHTML = '<i class="fa-solid fa-pen"></i>';
+                editButton.setAttribute('aria-label', 'Editar');
+                editButton.addEventListener('click', () => editCatalogItem(index));
+                const deleteButton = document.createElement('button');
+                deleteButton.type = 'button';
+                deleteButton.className = 'px-2 py-1 text-red-600 hover:text-red-800';
+                deleteButton.innerHTML = '<i class="fa-solid fa-trash"></i>';
+                deleteButton.setAttribute('aria-label', 'Eliminar');
+                deleteButton.addEventListener('click', () => deleteCatalogItem(index));
+                actions.append(editButton, deleteButton);
+                row.append(label, actions);
+                container.appendChild(row);
+            });
+        }
+
+        function handleSaveCatalog(event) {
+            event.preventDefault();
+            const input = document.getElementById('catalogNameInput');
+            const name = normalizeCatalogName(input.value);
+            if (!name) return;
+            const items = currentCatalogType === 'courses' ? appState.courses.map(course => course.name) : appState.teachers;
+            if (items.some(item => item.localeCompare(name, 'es', { sensitivity: 'accent' }) === 0)) {
+                showToast('Ese nombre ya existe');
+                return;
+            }
+            if (currentCatalogType === 'courses') {
+                const id = `course_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+                appState.courses.push({ id, name, teacher: appState.teachers[0] });
+                appState.courseData[id] = { students: [], attendanceByPeriod: {} };
+            } else {
+                appState.teachers.push(name);
+            }
+            input.value = '';
+            renderCourseAndTeacherSelects();
+            renderCatalogItems();
+            saveData();
+            showToast('Registro agregado');
+        }
+
+        function editCatalogItem(index) {
+            const item = currentCatalogType === 'courses' ? appState.courses[index] : appState.teachers[index];
+            const previousName = currentCatalogType === 'courses' ? item.name : item;
+            const name = normalizeCatalogName(prompt('Editar nombre:', previousName) || '');
+            if (!name || name === previousName) return;
+            const items = currentCatalogType === 'courses' ? appState.courses.map(course => course.name) : appState.teachers;
+            if (items.some((value, itemIndex) => itemIndex !== index && value.localeCompare(name, 'es', { sensitivity: 'accent' }) === 0)) {
+                showToast('Ese nombre ya existe');
+                return;
+            }
+            if (currentCatalogType === 'courses') {
+                item.name = name;
+            } else {
+                appState.teachers[index] = name;
+                appState.courses.forEach(course => { if (course.teacher === previousName) course.teacher = name; });
+            }
+            renderCourseAndTeacherSelects();
+            renderCatalogItems();
+            saveData();
+            showToast('Registro actualizado');
+        }
+
+        function deleteCatalogItem(index) {
+            if (currentCatalogType === 'courses') {
+                if (appState.courses.length === 1) {
+                    showToast('Debe conservar al menos un curso');
+                    return;
+                }
+                const course = appState.courses[index];
+                if (!confirm(`¿Eliminar el curso ${course.name} y su asistencia?`)) return;
+                saveActiveCourseData();
+                delete appState.courseData[course.id];
+                appState.courses.splice(index, 1);
+                if (appState.currentCourseId === course.id) {
+                    appState.currentCourseId = appState.courses[0].id;
+                    loadActiveCourseData();
+                }
+            } else {
+                if (appState.teachers.length === 1) {
+                    showToast('Debe conservar al menos un profesor');
+                    return;
+                }
+                const teacher = appState.teachers[index];
+                if (!confirm(`¿Eliminar a ${teacher}?`)) return;
+                appState.teachers.splice(index, 1);
+                appState.courses.forEach(course => { if (course.teacher === teacher) course.teacher = appState.teachers[0]; });
+            }
+            renderCourseAndTeacherSelects();
+            renderCatalogItems();
+            saveData();
+            renderTable();
+            showToast('Registro eliminado');
+        }
+
+        // Note / Observation Modal Handlers
+        function openNoteModalDirect(e, studentId, day) {
+            e.preventDefault();
+            currentNoteContext = { studentId, day };
+            const student = appState.students.find(s => s.id === studentId);
+            const key = `${studentId}_${day}`;
+            const entry = appState.attendance[key] || { status: '', note: '' };
+
+            document.getElementById('noteStudentDayInfo').textContent = `${student.name} - Día ${day} de ${appState.month}`;
+            document.getElementById('noteTextInput').value = entry.note || '';
+            document.getElementById('noteModal').classList.remove('hidden');
+        }
+
+        function openNoteModalForStudent(studentId) {
+            currentNoteContext = { studentId, day: 1 };
+            const student = appState.students.find(s => s.id === studentId);
+            const key = `${studentId}_1`;
+            const entry = appState.attendance[key] || { status: '', note: '' };
+
+            document.getElementById('noteStudentDayInfo').textContent = `${student.name} - Notas y Observaciones`;
+            document.getElementById('noteTextInput').value = entry.note || '';
+            document.getElementById('noteModal').classList.remove('hidden');
+        }
+
+        function closeNoteModal() {
+            document.getElementById('noteModal').classList.add('hidden');
+        }
+
+        function saveNote() {
+            const { studentId, day } = currentNoteContext;
+            const noteText = document.getElementById('noteTextInput').value.trim();
+            const key = `${studentId}_${day}`;
+
+            if (!appState.attendance[key]) {
+                appState.attendance[key] = { status: '', note: noteText };
+            } else {
+                appState.attendance[key].note = noteText;
+            }
+
+            saveData();
+            closeNoteModal();
+            renderTable();
+            showToast("Observación guardada con éxito");
+        }
+
+        function clearNote() {
+            const { studentId, day } = currentNoteContext;
+            const key = `${studentId}_${day}`;
+            if (appState.attendance[key]) {
+                appState.attendance[key].note = '';
+                saveData();
+            }
+            closeNoteModal();
+            renderTable();
+            showToast("Nota eliminada");
+        }
+
+        // Reset Month
+        function resetMonthData() {
+            if (confirm("¿Desea reiniciar todos los registros de asistencia del mes actual?")) {
+                appState.attendance = {};
+                saveData();
+                renderTable();
+                showToast("Registro de asistencia reiniciado");
+            }
+        }
+
+        // Export to Excel / CSV
+        function exportToExcelCSV() {
+            let csvContent = "\uFEFF"; // BOM for Excel UTF-8
+            csvContent += `INSTITUCIÓN:,${appState.school}\n`;
+            csvContent += `PROFESORA JEFE:,${getCurrentCourse().teacher}\n`;
+            csvContent += `CURSO:,${getCurrentCourse().name}\n`;
+            csvContent += `AÑO:,${appState.year}\n`;
+            csvContent += `MES:,${appState.month}\n\n`;
+
+            let headerRow = "Nº,Nombres y Apellidos";
+            for (let d = 1; d <= getCalendar().days; d++) {
+                headerRow += `,Día ${d}`;
+            }
+            headerRow += ",% Asistencia,% Ausencia,% Tardanza,% Justificación\n";
+            csvContent += headerRow;
+
+            appState.students.forEach((student, index) => {
+                const stats = calculateStudentStats(student.id);
+                let row = `${index + 1},"${student.name}"`;
+                for (let d = 1; d <= getCalendar().days; d++) {
+                    const key = `${student.id}_${d}`;
+                    const entry = appState.attendance[key];
+                    const val = entry ? entry.status : "";
+                    row += `,${val}`;
+                }
+                row += `,${stats.pctAsis}%,${stats.pctAus}%,${stats.pctTar}%,${stats.pctJus}%\n`;
+                csvContent += row;
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `Asistencia_${getCurrentCourse().name}_${appState.month}_${appState.year}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showToast("Archivo Excel (CSV) descargado con éxito");
+        }
+
+        // Toast Notification Helper
+        function showToast(message) {
+            const toast = document.getElementById('toastNotification');
+            document.getElementById('toastMessage').textContent = message;
+            toast.classList.remove('translate-y-24', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-24', 'opacity-0');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
