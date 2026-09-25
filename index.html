@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduControl Asistencia - Gestión Escolar Avanzada</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        [x-cloak] { display: none !important; }
+        ::-webkit-scrollbar { height: 10px; width: 10px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 6px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 6px; border: 2px solid #f1f5f9; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen" x-data="attendanceApp()">
+
+    <!-- HEADER INSTITUCIONAL -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center space-x-3 cursor-pointer group" @click="openLogoModal = true" title="Cambiar logo institucional">
+                <div class="relative w-12 h-12 rounded-xl bg-indigo-50 border-2 border-indigo-200 overflow-hidden flex items-center justify-center shadow-inner group-hover:border-indigo-400 transition-colors">
+                    <template x-if="schoolLogo">
+                        <img :src="schoolLogo" alt="Logo" class="w-full h-full object-cover">
+                    </template>
+                    <template x-if="!schoolLogo">
+                        <span class="text-indigo-600 font-bold text-xl">E</span>
+                    </template>
+                </div>
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <h1 class="text-xl font-bold text-slate-900 tracking-tight" x-text="schoolName"></h1>
+                    </div>
+                    <p class="text-xs text-slate-500">Gestión escolar avanzada</p>
+                </div>
+            </div>
+
+            <div class="flex items-center flex-wrap gap-2">
+                <button @click="openCourseModal = true" class="px-4 py-2 rounded-xl text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition">
+                    Mantenedor de Cursos
+                </button>
+                <button @click="openTeacherModal = true" class="px-4 py-2 rounded-xl text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition">
+                    Mantenedor de Profesores
+                </button>
+                <button @click="openIconModal = true" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 transition">
+                    Iconografía
+                </button>
+                <button @click="exportCSV()" class="px-4 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-md transition">
+                    Exportar CSV
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <main class="max-w-[1600px] mx-auto px-4 py-6 space-y-6">
+
+        <!-- CONTROLES DE FECHA Y CURSO -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center space-x-4">
+                <div class="bg-slate-50 border border-slate-300 rounded-xl px-4 py-2 shadow-inner">
+                    <select x-model.number="selectedYear" @change="saveData()" class="bg-transparent text-base font-bold text-slate-700 focus:outline-none cursor-pointer">
+                        <option value="2025">2025</option>
+                        <option value="2026">2026</option>
+                        <option value="2027">2027</option>
+                    </select>
+                </div>
+                <div class="bg-slate-50 border border-slate-300 rounded-xl px-4 py-2 shadow-inner">
+                    <select x-model.number="selectedMonth" @change="saveData()" class="bg-transparent text-base font-bold text-slate-700 focus:outline-none cursor-pointer">
+                        <template x-for="(mName, mIdx) in monthNames" :key="mIdx">
+                            <option :value="mIdx" x-text="mName"></option>
+                        </template>
+                    </select>
+                </div>
+            </div>
+
+            <div class="flex items-center flex-wrap gap-2">
+                <template x-for="course in courses" :key="course.id">
+                    <button @click="currentCourseId = course.id; saveData()"
+                        :class="currentCourseId === course.id ? 'bg-indigo-700 text-white shadow-md border-indigo-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200'"
+                        class="px-5 py-2.5 rounded-xl text-sm font-bold border transition-all flex items-center space-x-2">
+                        <span x-text="course.name"></span>
+                        <span :class="currentCourseId === course.id ? 'bg-indigo-800 text-indigo-100' : 'bg-slate-200 text-slate-700'" class="text-xs px-2 py-0.5 rounded-full font-black" x-text="getStudentCount(course.id)"></span>
+                    </button>
+                </template>
+            </div>
+        </div>
+
+        <!-- RESUMEN ESTADÍSTICO -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div><p class="text-sm font-bold uppercase text-slate-400">Asistencia</p><p class="text-3xl font-black text-slate-900 mt-1" x-text="globalStats.attendance + '%'"></p></div>
+                <div class="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-2xl" x-text="icons.present"></div>
+            </div>
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div><p class="text-sm font-bold uppercase text-slate-400">Ausencia</p><p class="text-3xl font-black text-slate-900 mt-1" x-text="globalStats.absence + '%'"></p></div>
+                <div class="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold text-2xl" x-text="icons.absence"></div>
+            </div>
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div><p class="text-sm font-bold uppercase text-slate-400">Tardanza</p><p class="text-3xl font-black text-slate-900 mt-1" x-text="globalStats.tardy + '%'"></p></div>
+                <div class="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-2xl" x-text="icons.tardy"></div>
+            </div>
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div><p class="text-sm font-bold uppercase text-slate-400">Justificación</p><p class="text-3xl font-black text-slate-900 mt-1" x-text="globalStats.justified + '%'"></p></div>
+                <div class="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-2xl" x-text="icons.justified"></div>
+            </div>
+        </div>
+
+        <!-- PANEL DE ASISTENCIA -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="p-5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-4 bg-slate-50/50">
+                <div class="flex items-center space-x-4">
+                    <h3 class="text-lg font-bold text-slate-900" x-text="currentCourseName"></h3>
+                    <span class="text-sm text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-lg font-semibold" x-text="'Profesor(a): ' + currentTeacherName"></span>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <input type="text" x-model="searchQuery" placeholder="Buscar alumno..." class="px-4 py-2.5 border border-slate-300 rounded-xl text-sm w-72 focus:ring-2 focus:ring-indigo-500 outline-none">
+                    <button @click="openStudentModal = true" class="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md transition">
+                        + Agregar Alumno
+                    </button>
+                </div>
+            </div>
+
+            <!-- TABLA DE ASISTENCIA -->
+            <div class="overflow-x-auto pb-4">
+                <table class="w-full text-left border-collapse whitespace-nowrap">
+                    <thead>
+                        <tr class="bg-slate-900 text-white text-xs uppercase tracking-wider">
+                            <th class="py-4 px-3 text-center w-14 border-r border-slate-700 sticky left-0 z-20 bg-slate-900">Nº</th>
+                            <th class="py-4 px-4 min-w-[320px] border-r border-slate-700 sticky left-14 z-20 bg-slate-900">Nombres y Apellidos</th>
+                            <template x-for="day in daysInMonth" :key="day.dayNumber">
+                                <th class="py-3 px-2 text-center min-w-[50px] border-r border-slate-800" :class="day.isWeekend || day.isHoliday ? 'bg-slate-800 text-slate-500' : ''">
+                                    <div class="text-[11px] font-semibold text-slate-400 mb-0.5" x-text="day.dayName"></div>
+                                    <div class="text-sm font-black" x-text="day.dayNumber"></div>
+                                </th>
+                            </template>
+                            <th class="py-4 px-3 text-center min-w-[70px] bg-slate-800">% A</th>
+                            <th class="py-4 px-3 text-center min-w-[70px] bg-slate-800">% U</th>
+                            <th class="py-4 px-3 text-center min-w-[70px] bg-slate-800">% T</th>
+                            <th class="py-4 px-3 text-center min-w-[70px] bg-slate-800">% J</th>
+                            <th class="py-4 px-3 text-center w-20 bg-slate-800">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200 text-sm font-medium">
+                        <template x-for="(student, index) in filteredStudents" :key="student.id">
+                            <tr class="hover:bg-slate-50/80 transition-colors">
+                                <td class="py-3 px-3 text-center text-slate-500 border-r border-slate-200 bg-white sticky left-0 z-10 font-bold" x-text="index + 1"></td>
+                                <td class="py-3 px-4 text-slate-900 border-r border-slate-200 bg-white sticky left-14 z-10 font-bold flex items-center justify-between group">
+                                    <span x-text="student.name"></span>
+                                    <div class="flex items-center space-x-1.5">
+                                        <button @click.stop="openEditStudentModal(student)" class="opacity-0 group-hover:opacity-100 text-xs text-slate-400 hover:text-indigo-600 p-1 transition-opacity" title="Editar nombre de estudiante">✏️</button>
+                                        <template x-if="hasStudentNotes(student.id)">
+                                            <span class="w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-sm" title="Tiene anotaciones este mes"></span>
+                                        </template>
+                                    </div>
+                                </td>
+                                <template x-for="day in daysInMonth" :key="day.dayNumber">
+                                    <td class="p-1.5 text-center border-r border-slate-200 relative group" :class="day.isWeekend || day.isHoliday ? 'bg-slate-100' : 'cursor-pointer hover:bg-indigo-50'"
+                                        @click="if(!day.isWeekend && !day.isHoliday) cycleAttendance(student.id, day.dayNumber)"
+                                        @contextmenu.prevent="if(!day.isWeekend && !day.isHoliday) openNoteModal(student.id, day.dayNumber)"
+                                        :title="getNoteText(student.id, day.dayNumber) || (day.isWeekend || day.isHoliday ? '' : 'Clic izquierdo: Cambiar estado | Clic derecho: Anotación')">
+                                        
+                                        <div class="relative w-10 h-10 mx-auto rounded-xl flex items-center justify-center font-bold text-base transition-colors"
+                                            :class="getStatusClass(student.id, day.dayNumber, day.isWeekend || day.isHoliday)">
+                                            <span x-text="getStatusSymbol(student.id, day.dayNumber, day.isWeekend || day.isHoliday)"></span>
+                                            
+                                            <template x-if="hasNoteForDay(student.id, day.dayNumber)">
+                                                <div class="absolute -top-1.5 -right-1.5 w-4 h-4 bg-indigo-600 border-2 border-white rounded-full flex items-center justify-center shadow-md">
+                                                    <span class="text-[8px] leading-none text-white block">📝</span>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </td>
+                                </template>
+                                <td class="py-3 px-3 text-center font-black text-emerald-600 bg-emerald-50/30" x-text="getStudentStats(student.id).attendance + '%'"></td>
+                                <td class="py-3 px-3 text-center font-black text-rose-600 bg-rose-50/30" x-text="getStudentStats(student.id).absence + '%'"></td>
+                                <td class="py-3 px-3 text-center font-black text-amber-600 bg-amber-50/30" x-text="getStudentStats(student.id).tardy + '%'"></td>
+                                <td class="py-3 px-3 text-center font-black text-blue-600 bg-blue-50/30" x-text="getStudentStats(student.id).justified + '%'"></td>
+                                <td class="py-3 px-3 text-center bg-slate-50">
+                                    <button @click="deleteStudent(student.id)" class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-rose-600 hover:border-rose-300 shadow-sm transition">✕</button>
+                                </td>
+                            </tr>
+                        </template>
+                        <template x-if="filteredStudents.length === 0">
+                            <tr>
+                                <td colspan="40" class="py-12 text-center text-slate-500 font-medium text-base">No hay alumnos registrados en este curso. Haz clic en "Agregar Alumno" para comenzar.</td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+            <div class="p-4 bg-slate-50 border-t border-slate-200 text-sm text-slate-600 font-medium flex items-center justify-center space-x-6">
+                <span>🖱️ <b>Clic izquierdo:</b> Alternar estado</span>
+                <span>📋 <b>Clic derecho:</b> Agregar/Ver anotación</span>
+                <span>📝 <b>Ícono azul:</b> Día con anotación</span>
+            </div>
+        </div>
+
+        <!-- BITÁCORA DE CLASES Y ACTIVIDADES -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">Bitácora de Clases y Actividades</h3>
+                    <p class="text-sm text-slate-500 mt-1">Registra contenidos, tareas o hitos específicos para <span class="font-bold text-slate-700" x-text="currentCourseName"></span>.</p>
+                </div>
+            </div>
+            <div class="p-5">
+                <!-- FORMULARIO DE REGISTRO / EDICIÓN -->
+                <div class="flex flex-wrap lg:flex-nowrap gap-3 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <input type="date" x-model="newLogDate" class="px-4 py-2.5 border border-slate-300 rounded-xl text-sm font-semibold text-slate-700 w-full sm:w-44 focus:ring-2 focus:ring-indigo-500 outline-none">
+                    
+                    <!-- SELECCIÓN DE ALUMNO -->
+                    <select x-model="newLogStudentId" class="px-4 py-2.5 border border-slate-300 rounded-xl text-sm font-semibold text-slate-700 w-full sm:w-64 focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer">
+                        <option value="">-- Todo el Curso (General) --</option>
+                        <template x-for="st in currentStudents" :key="st.id">
+                            <option :value="st.id" x-text="st.name"></option>
+                        </template>
+                    </select>
+
+                    <input type="text" x-model="newLogText" @keyup.enter="addOrUpdateCourseLog()" placeholder="Ej: Se realiza ejercicio de contención con alumno..." class="flex-1 px-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none w-full">
+                    
+                    <div class="flex items-center space-x-2 w-full sm:w-auto">
+                        <button @click="addOrUpdateCourseLog()" class="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md transition w-full sm:w-auto whitespace-nowrap" x-text="editingLogId ? 'Actualizar Registro' : 'Guardar Registro'">
+                        </button>
+                        <button x-show="editingLogId" @click="cancelEditLog()" class="px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 bg-slate-200 hover:bg-slate-300 transition">
+                            Cancelar
+                        </button>
+                    </div>
+                </div>
+
+                <!-- LISTA DE REGISTROS -->
+                <div class="space-y-3">
+                    <template x-for="log in currentCourseLogs" :key="log.id">
+                        <div class="p-4 bg-white border border-slate-200 rounded-xl shadow-sm flex justify-between items-start group hover:border-indigo-200 transition">
+                            <div>
+                                <div class="flex flex-wrap items-center gap-2 mb-2">
+                                    <span class="text-xs font-black text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md shadow-inner" x-text="formatDate(log.date)"></span>
+                                    <template x-if="log.studentId">
+                                        <span class="text-xs font-bold text-purple-700 bg-purple-50 border border-purple-200 px-2.5 py-1 rounded-md" x-text="'👤 Alumno: ' + getStudentNameById(log.studentId)"></span>
+                                    </template>
+                                </div>
+                                <p class="text-sm text-slate-800 font-medium leading-relaxed" x-text="log.text"></p>
+                            </div>
+                            <div class="flex items-center space-x-2 opacity-80 group-hover:opacity-100 transition-opacity">
+                                <button @click="startEditLog(log)" class="text-slate-400 hover:text-indigo-600 font-bold px-2 py-1 text-sm transition-colors" title="Editar este registro">✏️</button>
+                                <button @click="deleteCourseLog(log.id)" class="text-slate-400 hover:text-rose-500 font-bold px-2 py-1 text-sm transition-colors" title="Eliminar este registro">✕</button>
+                            </div>
+                        </div>
+                    </template>
+                    <template x-if="currentCourseLogs.length === 0">
+                        <div class="text-center py-8 bg-slate-50 border border-dashed border-slate-300 rounded-xl">
+                            <p class="text-sm text-slate-500 font-medium">No hay registros en la bitácora para este curso.</p>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- MODAL LOGO -->
+    <div x-show="openLogoModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl" @click.away="openLogoModal = false">
+            <div class="flex justify-between pb-4 border-b border-slate-100"><h3 class="font-bold text-slate-900 text-lg">Logo Institucional</h3><button @click="openLogoModal = false" class="text-slate-400 hover:text-slate-700 text-lg">✕</button></div>
+            <div class="space-y-4 text-sm">
+                <div><label class="block font-bold text-slate-700 mb-1">Nombre del Establecimiento</label><input type="text" x-model="schoolName" class="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"></div>
+                <div><label class="block font-bold text-slate-700 mb-1">Archivo de Imagen</label><input type="file" @change="handleLogoUpload($event)" accept="image/*" class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"></div>
+            </div>
+            <div class="flex justify-end space-x-3 pt-2">
+                <button @click="schoolLogo = ''; saveData(); openLogoModal = false" class="px-5 py-2.5 rounded-xl text-sm font-bold bg-rose-50 text-rose-600 hover:bg-rose-100">Quitar Logo</button>
+                <button @click="saveData(); openLogoModal = false" class="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL MANTENEDOR DE CURSOS (CON EDICIÓN) -->
+    <div x-show="openCourseModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-3xl max-w-lg w-full p-6 space-y-5 max-h-[85vh] overflow-y-auto shadow-2xl" @click.away="openCourseModal = false">
+            <div class="flex justify-between pb-4 border-b border-slate-100">
+                <h3 class="font-bold text-slate-900 text-lg">Mantenedor de Cursos</h3>
+                <button @click="openCourseModal = false" class="text-slate-400 hover:text-slate-700 text-lg">✕</button>
+            </div>
+            
+            <!-- FORMULARIO CREAR / EDITAR -->
+            <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4 text-sm">
+                <h4 class="font-bold text-slate-800 text-sm" x-text="editingCourseId ? '✏️ Editar Curso' : '➕ Crear Nuevo Curso'"></h4>
+                <div>
+                    <label class="font-bold text-slate-700 block mb-1">Nombre del Curso</label>
+                    <input type="text" x-model="newCourseName" class="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ej: 1° Básico A">
+                </div>
+                <div>
+                    <label class="font-bold text-slate-700 block mb-1">Profesor Jefe</label>
+                    <select x-model="newCourseTeacherId" class="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer">
+                        <option value="">-- Sin Asignar --</option>
+                        <template x-for="t in teachers" :key="t.id">
+                            <option :value="t.id" x-text="t.name"></option>
+                        </template>
+                    </select>
+                </div>
+                <div class="flex space-x-2 pt-1">
+                    <button @click="saveCourse()" class="flex-1 py-3 bg-indigo-600 text-white hover:bg-indigo-700 transition rounded-xl font-bold shadow-md" x-text="editingCourseId ? 'Guardar Cambios' : 'Crear Nuevo Curso'"></button>
+                    <button x-show="editingCourseId" @click="cancelCourseEdit()" class="px-5 py-3 bg-slate-200 text-slate-700 hover:bg-slate-300 transition rounded-xl font-bold">Cancelar</button>
+                </div>
+            </div>
+
+            <!-- LISTA DE CURSOS -->
+            <div class="space-y-3 mt-6">
+                <h4 class="font-bold text-slate-900 border-b pb-2">Cursos Registrados</h4>
+                <template x-for="c in courses" :key="c.id">
+                    <div class="flex justify-between items-center bg-white border border-slate-200 p-3.5 rounded-xl hover:border-indigo-200 transition">
+                        <div>
+                            <span class="font-bold text-slate-900 block" x-text="c.name"></span>
+                            <span class="text-xs font-semibold text-slate-500" x-text="getTeacherName(c.teacherId)"></span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button @click="startEditCourse(c)" class="text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-100 transition">Editar</button>
+                            <button @click="deleteCourse(c.id)" class="text-rose-500 bg-rose-50 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-rose-100 transition">Eliminar</button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL EDITAR NOMBRE DE ESTUDIANTE -->
+    <div x-show="openEditStudentModalFlag" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl" @click.away="openEditStudentModalFlag = false">
+            <div class="flex justify-between pb-3 border-b border-slate-100">
+                <h3 class="font-bold text-slate-900 text-lg">Editar Estudiante</h3>
+                <button @click="openEditStudentModalFlag = false" class="text-slate-400 hover:text-slate-700 text-lg">✕</button>
+            </div>
+            <div class="text-sm space-y-3">
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Nombre Completo</label>
+                    <input type="text" x-model="editingStudentName" @keyup.enter="saveStudentName()" class="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <button @click="saveStudentName()" class="w-full py-3 bg-indigo-600 text-white hover:bg-indigo-700 transition rounded-xl font-bold">Guardar Nombre</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL ESTUDIANTES -->
+    <div x-show="openStudentModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl" @click.away="openStudentModal = false">
+            <div class="flex justify-between pb-4 border-b border-slate-100"><h3 class="font-bold text-slate-900 text-lg">Agregar Alumno</h3><button @click="openStudentModal = false" class="text-slate-400 hover:text-slate-700 text-lg">✕</button></div>
+            <div class="flex space-x-2 text-sm bg-slate-100 p-1.5 rounded-xl">
+                <button @click="studentImportMode = 'individual'" :class="studentImportMode === 'individual' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:bg-slate-200'" class="px-4 py-2 rounded-lg flex-1 font-bold transition">Individual</button>
+                <button @click="studentImportMode = 'masivo'" :class="studentImportMode === 'masivo' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:bg-slate-200'" class="px-4 py-2 rounded-lg flex-1 font-bold transition">Lista Masiva</button>
+            </div>
+            <template x-if="studentImportMode === 'individual'">
+                <div class="text-sm space-y-3">
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Nombre Completo</label>
+                        <input type="text" x-model="newStudentName" @keyup.enter="addStudent()" class="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ej: PÉREZ DÍAZ JUAN ANDRÉS">
+                    </div>
+                    <button @click="addStudent()" class="w-full py-3 bg-indigo-600 text-white hover:bg-indigo-700 transition rounded-xl font-bold">Guardar Alumno</button>
+                </div>
+            </template>
+            <template x-if="studentImportMode === 'masivo'">
+                <div class="text-sm space-y-3">
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Nombres (Uno por línea)</label>
+                        <textarea x-model="bulkStudentsText" rows="6" class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="PÉREZ JUAN&#10;GÓMEZ MARÍA&#10;SOTO PEDRO"></textarea>
+                    </div>
+                    <button @click="addBulkStudents()" class="w-full py-3 bg-indigo-600 text-white hover:bg-indigo-700 transition rounded-xl font-bold">Importar Lista Completa</button>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <!-- MODAL PROFESORES -->
+    <div x-show="openTeacherModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 space-y-5 max-h-[85vh] overflow-y-auto shadow-2xl" @click.away="openTeacherModal = false">
+            <div class="flex justify-between pb-4 border-b border-slate-100"><h3 class="font-bold text-slate-900 text-lg">Mantenedor de Profesores</h3><button @click="openTeacherModal = false" class="text-slate-400 hover:text-slate-700 text-lg">✕</button></div>
+            <div class="flex space-x-3 text-sm">
+                <input type="text" x-model="newTeacherName" @keyup.enter="createTeacher()" placeholder="Nombre completo del docente..." class="flex-1 px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none">
+                <button @click="createTeacher()" class="px-5 py-2.5 bg-indigo-600 text-white hover:bg-indigo-700 transition rounded-xl font-bold shadow-md">Agregar</button>
+            </div>
+            <div class="space-y-3 mt-6">
+                <h4 class="font-bold text-slate-900 border-b pb-2">Nómina Docente</h4>
+                <template x-for="t in teachers" :key="t.id">
+                    <div class="flex justify-between items-center bg-white border border-slate-200 p-3.5 rounded-xl hover:border-indigo-200 transition">
+                        <span class="font-bold text-slate-800" x-text="t.name"></span>
+                        <button @click="deleteTeacher(t.id)" class="text-rose-500 bg-rose-50 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-rose-100 transition">Eliminar</button>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL ICONOS -->
+    <div x-show="openIconModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-6 space-y-5 shadow-2xl" @click.away="openIconModal = false">
+            <div class="flex justify-between pb-4 border-b border-slate-100"><h3 class="font-bold text-slate-900 text-lg">Personalizar Iconos</h3><button @click="openIconModal = false" class="text-slate-400 hover:text-slate-700 text-lg">✕</button></div>
+            <div class="space-y-4 text-sm bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                <div class="flex items-center justify-between"><label class="font-black text-emerald-600">Presente</label><input type="text" x-model="icons.present" class="w-16 px-2 py-1.5 border border-slate-300 text-center font-bold text-xl rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"></div>
+                <div class="flex items-center justify-between"><label class="font-black text-rose-600">Ausente</label><input type="text" x-model="icons.absence" class="w-16 px-2 py-1.5 border border-slate-300 text-center font-bold text-xl rounded-lg focus:ring-2 focus:ring-rose-500 outline-none"></div>
+                <div class="flex items-center justify-between"><label class="font-black text-amber-600">Tardanza</label><input type="text" x-model="icons.tardy" class="w-16 px-2 py-1.5 border border-slate-300 text-center font-bold text-xl rounded-lg focus:ring-2 focus:ring-amber-500 outline-none"></div>
+                <div class="flex items-center justify-between"><label class="font-black text-blue-600">Justificado</label><input type="text" x-model="icons.justified" class="w-16 px-2 py-1.5 border border-slate-300 text-center font-bold text-xl rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"></div>
+            </div>
+            <button @click="saveData(); openIconModal = false" class="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm shadow-md hover:bg-indigo-700 transition mt-2">Guardar Configuraciones</button>
+        </div>
+    </div>
+
+    <!-- MODAL NOTAS (ANOTACIÓN DIARIA) -->
+    <div x-show="openNoteModalFlag" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl transform transition-all" @click.away="openNoteModalFlag = false">
+            <div class="flex justify-between pb-3 border-b border-slate-100">
+                <h3 class="font-bold text-slate-900 text-lg flex items-center gap-2">📝 Anotación Diaria</h3>
+                <button @click="openNoteModalFlag = false" class="text-slate-400 hover:text-slate-700 text-lg">✕</button>
+            </div>
+            <div class="text-sm bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                <p class="text-slate-600 mb-1">Estudiante: <span class="font-bold text-indigo-800" x-text="selectedNoteStudentName"></span></p>
+                <p class="text-slate-600">Día seleccionado: <span class="font-bold text-indigo-800" x-text="selectedNoteDay"></span> del mes</p>
+            </div>
+            <textarea x-model="currentNoteText" rows="5" placeholder="Escribe aquí la observación, justificación o comportamiento para este día..." class="w-full px-4 py-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none"></textarea>
+            <button @click="saveStudentNote()" class="w-full py-3 bg-indigo-600 text-white hover:bg-indigo-700 transition rounded-xl font-bold text-sm shadow-md">Guardar Anotación</button>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT -->
+    <script>
+        function attendanceApp() {
+            return {
+                schoolName: 'EduControl Asistencia',
+                schoolLogo: '',
+                selectedYear: 2026,
+                selectedMonth: 8, 
+                monthNames: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'],
+                
+                courses: [{ id: 1, name: '1° Básico', teacherId: 1 }],
+                teachers: [{ id: 1, name: 'Prof. Ana María Soto' }],
+                students: [], 
+                attendance: {}, 
+                notes: {}, 
+                courseLogs: [],
+
+                currentCourseId: 1,
+                searchQuery: '',
+                icons: { present: '✓', absence: '✕', tardy: 'T', justified: 'J' },
+
+                // Modales
+                openLogoModal: false, openCourseModal: false, openTeacherModal: false,
+                openIconModal: false, openStudentModal: false, openNoteModalFlag: false,
+                openEditStudentModalFlag: false,
+
+                // Estados de edición
+                editingCourseId: null,
+                editingLogId: null,
+                editingStudentId: null,
+                editingStudentName: '',
+
+                studentImportMode: 'individual', newStudentName: '', bulkStudentsText: '',
+                newCourseName: '', newCourseTeacherId: '', newTeacherName: '',
+                selectedNoteStudentId: null, selectedNoteDay: null, currentNoteText: '',
+                
+                newLogDate: new Date().toISOString().split('T')[0],
+                newLogStudentId: '',
+                newLogText: '',
+
+                init() {
+                    const saved = localStorage.getItem('educontrol_data_v6');
+                    if (saved) {
+                        try {
+                            const data = JSON.parse(saved);
+                            this.schoolName = data.schoolName || this.schoolName;
+                            this.schoolLogo = data.schoolLogo || this.schoolLogo;
+                            this.courses = data.courses || this.courses;
+                            this.teachers = data.teachers || this.teachers;
+                            this.students = data.students || this.students;
+                            this.attendance = data.attendance || {};
+                            this.notes = data.notes || {};
+                            this.courseLogs = data.courseLogs || [];
+                            if (data.icons) this.icons = data.icons;
+                            this.currentCourseId = data.currentCourseId || (this.courses.length > 0 ? this.courses[0].id : 1);
+                            this.selectedYear = data.selectedYear || this.selectedYear;
+                            this.selectedMonth = data.selectedMonth !== undefined ? data.selectedMonth : this.selectedMonth;
+                        } catch (e) { console.error(e); }
+                    }
+                },
+                saveData() {
+                    try {
+                        localStorage.setItem('educontrol_data_v6', JSON.stringify({
+                            schoolName: this.schoolName, schoolLogo: this.schoolLogo, courses: this.courses,
+                            teachers: this.teachers, students: this.students, attendance: this.attendance,
+                            notes: this.notes, courseLogs: this.courseLogs, icons: this.icons, 
+                            currentCourseId: this.currentCourseId, selectedYear: this.selectedYear, 
+                            selectedMonth: this.selectedMonth
+                        }));
+                    } catch (e) { alert('Error al guardar datos. Si subiste un logo, intenta con una imagen de menor tamaño.'); }
+                },
+                
+                // --- LÓGICA DE CURSOS (CREAR / EDITAR) ---
+                startEditCourse(course) {
+                    this.editingCourseId = course.id;
+                    this.newCourseName = course.name;
+                    this.newCourseTeacherId = course.teacherId || '';
+                },
+                cancelCourseEdit() {
+                    this.editingCourseId = null;
+                    this.newCourseName = '';
+                    this.newCourseTeacherId = '';
+                },
+                saveCourse() {
+                    if (!this.newCourseName.trim()) return;
+                    if (this.editingCourseId) {
+                        const c = this.courses.find(x => x.id === this.editingCourseId);
+                        if (c) {
+                            c.name = this.newCourseName.trim();
+                            c.teacherId = this.newCourseTeacherId ? Number(this.newCourseTeacherId) : null;
+                        }
+                    } else {
+                        const nId = (this.courses.length ? Math.max(...this.courses.map(c => c.id)) : 0) + 1;
+                        this.courses.push({ id: nId, name: this.newCourseName.trim(), teacherId: this.newCourseTeacherId ? Number(this.newCourseTeacherId) : null });
+                        this.currentCourseId = nId;
+                    }
+                    this.cancelCourseEdit();
+                    this.saveData();
+                },
+                deleteCourse(id) {
+                    if (this.courses.length <= 1) { alert('Debe existir al menos un curso.'); return; }
+                    if (confirm('ATENCIÓN: ¿Eliminar curso, todos sus alumnos y su bitácora?')) {
+                        this.courses = this.courses.filter(c => c.id !== id);
+                        this.students = this.students.filter(s => s.courseId !== id);
+                        this.courseLogs = this.courseLogs.filter(l => l.courseId !== id);
+                        this.currentCourseId = this.courses[0].id; 
+                        this.saveData();
+                    }
+                },
+
+                // --- LÓGICA DE BITÁCORA ---
+                get currentCourseLogs() {
+                    return this.courseLogs
+                        .filter(l => l.courseId === this.currentCourseId)
+                        .sort((a, b) => new Date(b.date) - new Date(a.date));
+                },
+                addOrUpdateCourseLog() {
+                    if (!this.newLogText.trim() || !this.newLogDate) return;
+                    if (this.editingLogId) {
+                        const log = this.courseLogs.find(l => l.id === this.editingLogId);
+                        if (log) {
+                            log.date = this.newLogDate;
+                            log.studentId = this.newLogStudentId ? Number(this.newLogStudentId) : null;
+                            log.text = this.newLogText.trim();
+                        }
+                        this.cancelEditLog();
+                    } else {
+                        this.courseLogs.push({ 
+                            id: Date.now(), 
+                            courseId: this.currentCourseId, 
+                            studentId: this.newLogStudentId ? Number(this.newLogStudentId) : null,
+                            date: this.newLogDate, 
+                            text: this.newLogText.trim() 
+                        });
+                        this.newLogText = '';
+                        this.newLogStudentId = '';
+                    }
+                    this.saveData();
+                },
+                startEditLog(log) {
+                    this.editingLogId = log.id;
+                    this.newLogDate = log.date;
+                    this.newLogStudentId = log.studentId || '';
+                    this.newLogText = log.text;
+                },
+                cancelEditLog() {
+                    this.editingLogId = null;
+                    this.newLogText = '';
+                    this.newLogStudentId = '';
+                    this.newLogDate = new Date().toISOString().split('T')[0];
+                },
+                deleteCourseLog(id) {
+                    if (confirm('¿Eliminar este registro de la bitácora?')) {
+                        this.courseLogs = this.courseLogs.filter(l => l.id !== id);
+                        if (this.editingLogId === id) this.cancelEditLog();
+                        this.saveData();
+                    }
+                },
+                getStudentNameById(studentId) {
+                    if (!studentId) return '';
+                    const s = this.students.find(x => x.id === Number(studentId));
+                    return s ? s.name : '';
+                },
+                formatDate(dateStr) {
+                    if(!dateStr) return '';
+                    const parts = dateStr.split('-');
+                    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+                },
+
+                // --- LÓGICA DE ESTUDIANTES Y EDICIÓN ---
+                openEditStudentModal(student) {
+                    this.editingStudentId = student.id;
+                    this.editingStudentName = student.name;
+                    this.openEditStudentModalFlag = true;
+                },
+                saveStudentName() {
+                    if (!this.editingStudentName.trim()) return;
+                    const s = this.students.find(x => x.id === this.editingStudentId);
+                    if (s) {
+                        s.name = this.editingStudentName.trim().toUpperCase();
+                    }
+                    this.saveData();
+                    this.openEditStudentModalFlag = false;
+                },
+
+                // --- FUNCIONES GENERALES ---
+                handleLogoUpload(event) {
+                    const file = event.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => { this.schoolLogo = e.target.result; this.saveData(); };
+                        reader.readAsDataURL(file);
+                    }
+                },
+                get currentCourseName() { const c = this.courses.find(x => x.id === this.currentCourseId); return c ? c.name : 'Sin Curso'; },
+                get currentTeacherName() {
+                    const c = this.courses.find(x => x.id === this.currentCourseId);
+                    if (!c) return 'Sin asignar';
+                    const t = this.teachers.find(x => x.id === c.teacherId);
+                    return t ? t.name : 'Sin asignar';
+                },
+                get currentStudents() { return this.students.filter(s => s.courseId === this.currentCourseId); },
+                get filteredStudents() {
+                    if (!this.searchQuery) return this.currentStudents;
+                    const q = this.searchQuery.toLowerCase();
+                    return this.currentStudents.filter(s => s.name.toLowerCase().includes(q));
+                },
+                getStudentCount(courseId) { return this.students.filter(s => s.courseId === courseId).length; },
+                getTeacherName(teacherId) { const t = this.teachers.find(x => x.id === Number(teacherId)); return t ? t.name : 'Sin asignar'; },
+                get daysInMonth() {
+                    const totalDays = new Date(this.selectedYear, this.selectedMonth + 1, 0).getDate();
+                    const dayNames = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+                    const holidays = ['1-1','1-5','21-5','16-7','15-8','18-9','19-9','12-10','31-10','1-11','8-12','25-12'];
+                    let days = [];
+                    for (let i = 1; i <= totalDays; i++) {
+                        const d = new Date(this.selectedYear, this.selectedMonth, i);
+                        const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                        days.push({ dayNumber: i, dayName: dayNames[d.getDay()], isWeekend: isWeekend, isHoliday: holidays.includes(`${i}-${this.selectedMonth+1}`) });
+                    }
+                    return days;
+                },
+                cycleAttendance(studentId, dayNum) {
+                    const key = `${studentId}_${this.selectedYear}_${this.selectedMonth}_${dayNum}`;
+                    const current = this.attendance[key];
+                    const newAttendance = { ...this.attendance };
+                    if (!current) newAttendance[key] = 'present';
+                    else if (current === 'present') newAttendance[key] = 'absence';
+                    else if (current === 'absence') newAttendance[key] = 'tardy';
+                    else if (current === 'tardy') newAttendance[key] = 'justified';
+                    else delete newAttendance[key];
+                    this.attendance = newAttendance;
+                    this.saveData();
+                },
+                getStatusClass(studentId, dayNum, isDisabled) {
+                    if (isDisabled) return 'bg-slate-200 text-slate-400 border-2 border-slate-300';
+                    const s = this.attendance[`${studentId}_${this.selectedYear}_${this.selectedMonth}_${dayNum}`];
+                    if (s === 'present') return 'bg-emerald-100 text-emerald-700 border-2 border-emerald-400 shadow-sm';
+                    if (s === 'absence') return 'bg-rose-100 text-rose-700 border-2 border-rose-400 shadow-sm';
+                    if (s === 'tardy') return 'bg-amber-100 text-amber-700 border-2 border-amber-400 shadow-sm';
+                    if (s === 'justified') return 'bg-blue-100 text-blue-700 border-2 border-blue-400 shadow-sm';
+                    return 'bg-slate-50 border-2 border-slate-200 text-transparent hover:border-indigo-400';
+                },
+                getStatusSymbol(studentId, dayNum, isDisabled) {
+                    if (isDisabled) return '';
+                    const s = this.attendance[`${studentId}_${this.selectedYear}_${this.selectedMonth}_${dayNum}`];
+                    if (s === 'present') return this.icons.present;
+                    if (s === 'absence') return this.icons.absence;
+                    if (s === 'tardy') return this.icons.tardy;
+                    if (s === 'justified') return this.icons.justified;
+                    return '';
+                },
+                hasStudentNotes(studentId) {
+                    const prefix = `${studentId}_${this.selectedYear}_${this.selectedMonth}_`;
+                    return Object.keys(this.notes).some(k => k.startsWith(prefix) && this.notes[k]);
+                },
+                hasNoteForDay(studentId, dayNum) {
+                    return !!this.notes[`${studentId}_${this.selectedYear}_${this.selectedMonth}_${dayNum}`];
+                },
+                getNoteText(studentId, dayNum) {
+                    return this.notes[`${studentId}_${this.selectedYear}_${this.selectedMonth}_${dayNum}`] || '';
+                },
+                openNoteModal(studentId, dayNum) {
+                    this.selectedNoteStudentId = studentId; this.selectedNoteDay = dayNum;
+                    this.currentNoteText = this.notes[`${studentId}_${this.selectedYear}_${this.selectedMonth}_${dayNum}`] || '';
+                    this.openNoteModalFlag = true;
+                },
+                get selectedNoteStudentName() { const s = this.students.find(x => x.id === this.selectedNoteStudentId); return s ? s.name : ''; },
+                saveStudentNote() {
+                    const key = `${this.selectedNoteStudentId}_${this.selectedYear}_${this.selectedMonth}_${this.selectedNoteDay}`;
+                    const n = { ...this.notes };
+                    if (this.currentNoteText.trim()) n[key] = this.currentNoteText.trim(); else delete n[key];
+                    this.notes = n; this.saveData(); this.openNoteModalFlag = false;
+                },
+                getStudentStats(studentId) {
+                    let p=0, a=0, t=0, j=0, tm=0;
+                    this.daysInMonth.forEach(day => {
+                        if (!day.isWeekend && !day.isHoliday) {
+                            const s = this.attendance[`${studentId}_${this.selectedYear}_${this.selectedMonth}_${day.dayNumber}`];
+                            if (s) { tm++; if(s==='present')p++; if(s==='absence')a++; if(s==='tardy')t++; if(s==='justified')j++; }
+                        }
+                    });
+                    if (tm === 0) return { attendance: 0, absence: 0, tardy: 0, justified: 0 };
+                    return { attendance: Math.round((p/tm)*100), absence: Math.round((a/tm)*100), tardy: Math.round((t/tm)*100), justified: Math.round((j/tm)*100) };
+                },
+                get globalStats() {
+                    const st = this.currentStudents;
+                    if (!st.length) return { attendance: 0, absence: 0, tardy: 0, justified: 0 };
+                    let sA=0, sU=0, sT=0, sJ=0;
+                    st.forEach(s => { const x = this.getStudentStats(s.id); sA+=x.attendance; sU+=x.absence; sT+=x.tardy; sJ+=x.justified; });
+                    return { attendance: Math.round(sA/st.length), absence: Math.round(sU/st.length), tardy: Math.round(sT/st.length), justified: Math.round(sJ/st.length) };
+                },
+                
+                addStudent() {
+                    if (!this.newStudentName.trim()) return;
+                    const newId = (this.students.length ? Math.max(...this.students.map(s => s.id)) : 0) + 1;
+                    this.students = [...this.students, { id: newId, courseId: this.currentCourseId, name: this.newStudentName.trim().toUpperCase() }];
+                    this.newStudentName = ''; 
+                    this.saveData(); 
+                    this.openStudentModal = false;
+                },
+                addBulkStudents() {
+                    if (!this.bulkStudentsText.trim()) return;
+                    let nId = (this.students.length ? Math.max(...this.students.map(s => s.id)) : 0) + 1;
+                    const newStudents = [];
+                    this.bulkStudentsText.split('\n').forEach(line => { 
+                        if (line.trim()) { newStudents.push({ id: nId++, courseId: this.currentCourseId, name: line.trim().toUpperCase() }); }
+                    });
+                    this.students = [...this.students, ...newStudents];
+                    this.bulkStudentsText = ''; 
+                    this.saveData(); 
+                    this.openStudentModal = false;
+                },
+                deleteStudent(id) { 
+                    if (confirm('¿Eliminar estudiante de forma permanente?')) { 
+                        this.students = this.students.filter(s => s.id !== id); 
+                        this.saveData(); 
+                    } 
+                },
+                createTeacher() {
+                    if (!this.newTeacherName.trim()) return;
+                    const nId = (this.teachers.length ? Math.max(...this.teachers.map(t => t.id)) : 0) + 1;
+                    this.teachers = [...this.teachers, { id: nId, name: this.newTeacherName.trim() }];
+                    this.newTeacherName = ''; 
+                    this.saveData();
+                },
+                deleteTeacher(id) { 
+                    if (confirm('¿Eliminar profesor?')) { 
+                        this.teachers = this.teachers.filter(t => t.id !== id); 
+                        this.saveData(); 
+                    } 
+                },
+                exportCSV() {
+                    let csv = "data:text/csv;charset=utf-8,Nº,Estudiante,% Asistencia,% Ausencia,% Tardanza,% Justificación\n";
+                    this.currentStudents.forEach((s, i) => {
+                        const x = this.getStudentStats(s.id);
+                        csv += `${i+1},"${s.name}",${x.attendance}%,${x.absence}%,${x.tardy}%,${x.justified}%\n`;
+                    });
+                    const l = document.createElement("a"); l.href = encodeURI(csv);
+                    l.download = `asistencia_${this.currentCourseName.replace(/\s+/g,'_')}_${this.selectedYear}.csv`;
+                    document.body.appendChild(l); l.click(); document.body.removeChild(l);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
